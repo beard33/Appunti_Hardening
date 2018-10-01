@@ -56,7 +56,9 @@ Due regole fondamentali del MAC sono definite dal modello [Bell-Lapadula](https:
 * S-Property: un soggetto può accedere ad un oggetto in append se ha un livello di sicurezza inferiore rispetto all'oggetto (_No WriteDown_)
 
 ##### Linux Security Modules
-E' un framework che permette al kernel linux di supportare diverse implementazioni dei moduli di sicurezza (tra cui il controllo MAC), e sono standard dalla versione 2.6 del kernel. A differenza di sistemi come `systrace` che utilizzano una forma di interposizione nelle syscall (poco funzionale in un'ottica di scalabilità), LSM utilizza un sistema di [_hooks_](https://en.wikipedia.org/wiki/Hooking): sono tecniche e interfacce (dette "di hooking") che permettono di intercettare, modificare o fermare il comportamento di una determinata componente intercettando eventi, messaggi o parametri passati tra componenti. Nel caso dell'LSM ogni volta che avviene una syscall e si passa da _user space_ a _kernel space_ dopo che sono avvenuti i controlli sui dati e sulla loro integrità viene eseguito un primo controllo dal DAC. Successivamente a questo controllo entra in gioco l'hook dell'LSM che rimanda all'implementazione il controllo sulla possibilità di esecuzione della syscall. L'LSM restituisce una risposta affermativa/negativa in relazione alla possibilità di esecuzione; se la risposta è negativa viene bloccata la systemcall (**pg 9 libro selinux**)
+E' un framework che permette al kernel linux di supportare diverse implementazioni dei moduli di sicurezza (tra cui il controllo MAC), e sono standard dalla versione 2.6 del kernel. A differenza di sistemi come `systrace` che utilizzano una forma di interposizione nelle syscall (poco funzionale in un'ottica di scalabilità), LSM utilizza un sistema di [_hooks_](https://en.wikipedia.org/wiki/Hooking): sono tecniche e interfacce (dette "di hooking") che permettono di intercettare, modificare o fermare il comportamento di una determinata componente intercettando eventi, messaggi o parametri passati tra componenti, trasferendo di fatto il controllo da un processo ad un altro in modo trasparente al processo che perde il controllo dell'esecuzione. Le principali tecniche di hooking consistono nel modificare codice eseguibile a runtime per implementare un modulo e sposterne l'esecuzione, modificare il contenuto di una libreria runtime, utilizzare chiamate ad API definite e  In genere un hook può soltanto ridurre i privilegi di accesso alle risorse.
+[](http://www.di-srv.unisa.it/~ads/corso-security/www/CORSO-0304/lsm/index.htm)
+Nel caso dell'LSM ogni volta che avviene una syscall e si passa da _user space_ a _kernel space_ dopo che sono avvenuti i controlli sui dati e sulla loro integrità viene eseguito un primo controllo dal DAC. Successivamente a questo controllo entra in gioco l'hook dell'LSM che rimanda all'implementazione il controllo sulla possibilità di esecuzione della syscall. L'LSM restituisce una risposta affermativa/negativa in relazione alla possibilità di esecuzione; se la risposta è negativa viene bloccata la systemcall (**pg 9 libro selinux**). **NB**: Gli LSM di per se non sono uno strumento di sicurezza, ma un framework per l'implementazione di moduli quali SELinux o AA. 
 
 ###### Fonti:
 * [DAC wikipedia](https://en.wikipedia.org/wiki/Discretionary_access_control)
@@ -66,7 +68,7 @@ E' un framework che permette al kernel linux di supportare diverse implementazio
 ## AppArmor
 
 #### Cos'è:
-Implementazione del MAC introdotto da Novell e costruito sull'interfaccia LSM (Linux Security Modules). Indica una serie di regole (note come _profilo_) su ciascun programma ed esso dipende dal percorso di installazione del programma in esecuzione (al contrario di SELinux le norme non dipendono dall'utente e ogni utente deve sottostare allo stesso insieme di regole quando è in esecuzione lo stesso programma). Definisce cosa le risorse possono accedere e con che permessi e a differenza di SELinux che si basa su etichette poste ai file, AA lavora sul percorso dei file
+Implementazione del MAC introdotto da Novell e costruito sull'interfaccia LSM (Linux Security Modules). Indica una serie di regole (note come _profilo_) su ciascun programma ed esso dipende dal percorso di installazione/esecuzione del programma in esecuzione (al contrario di SELinux le norme non dipendono dall'utente e ogni utente deve sottostare allo stesso insieme di regole quando è in esecuzione lo stesso programma). Definisce cosa le risorse possono accedere e con che permessi e a differenza di SELinux che si basa su etichette poste ai file, AA lavora sul percorso dei file
 
 #### Come funziona:
 I profili di AppArmor sono memorizzati in `etc/apparmor.d` e contengono un elenco delle regole di controllo d'accesso alla risorse che ogni programma può utilizzare. Attraverso [`apparmor_parser`](http://manpages.ubuntu.com/manpages/trusty/man8/apparmor_parser.8.html) i profili vengono compilati e caricati all'interno del kernel.
@@ -115,10 +117,17 @@ E' importante, per avere un profilo preciso, utilizzare la risorsa interessata i
 ### SELinux
 #### Cos'è: 
 Come Apparmor è un'implementazione del MAC che sfrutta il framework _Linux Security Modules_, ma a differenza di AA si basa su etichette ai file invece che ai percorsi di questi ultimi. Fu rilasciato per la prima volta nel dicembre 2000 a seguito di lavori dell'NSA (sviluppatrice iniziale del progetto) per dimostrare il valore dei controlli di accesso obbligatori in sistemi Linux (e più in generale Posix).
+Da notare che come anche AA, SELinux non può limitare exploit legati a vulnerabilità degli applicativi (può invece evitare che un applicativo exploited si comporti scondo privilegi che non possiede)
 #### Come funziona:
+SELinux non va a sovrascrivere o modificare le policy definite dal DAC (se un sistema senza SELinux previene un determinato accesso non c'è nulla che SELinux possa fare per sovrascrivere tale comportamento) poichè l'hook dell'LSM viene triggerato _dopo_ il check del DAC permission. Per questo motivo se ad esempio si necessita di garantire l'accesso ad un file ad un nuovo utente non sarà possibile farlo attraverso una policy di SEL ma sarà necessario implementare tale policy attraverso, ad esempio, l'utilizzo delle __access control lists__ tipiche dei sistemi posix.  (`setfacl` e `getfacl` permettono di gestire permessi aggiuntivi sui file e le directories). 
+Dove SEL ha possibilità di azione è riguardo alle [**capabilities**](https://www.linuxjournal.com/article/5737)
 
+La decisione di SELinux riguardo al consentire o negare una determinata azione è basata su il **subject** (ovvero chi compie l'azione) e l'**object** (ovvero il terget dell'azione da compiere)
+
+__nota__: SEL non ha alcuna conoscenza dell'owner del processo, di come questo è stato chiamato etc. Ciò che viene analizzato è il contesto, rappresentato da una _label_
 #### Come si installa:
 #### Come si configura:
+#### Differenze con AA:
 #### Cheat sheet:
 ###### Fonti:
 * [Wikipedia](https://it.wikipedia.org/wiki/Security-Enhanced_Linux)
