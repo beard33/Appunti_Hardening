@@ -20,7 +20,6 @@ L'hardening dipende anche dalla famiglia di sistemi operativi che si vuole rende
 * SELinux
 * Moduli GRSecurity
 * TomoyoLinux
-* FirewallD
 * Aide 
 * ...
 
@@ -55,7 +54,7 @@ Due regole fondamentali del MAC sono definite dal modello [Bell-Lapadula](https:
 * SS-Property: un soggetto può accedere ad un oggetto solo se il suo livello di sicurezza è maggiore od uguale a quello dell'oggetto (_No ReadUp_)
 * S-Property: un soggetto può accedere ad un oggetto in append se ha un livello di sicurezza inferiore rispetto all'oggetto (_No WriteDown_)
 
-##### Linux Security Modules
+#### Linux Security Modules:
 E' un framework che permette al kernel linux di supportare diverse implementazioni dei moduli di sicurezza (tra cui il controllo MAC), e sono standard dalla versione 2.6 del kernel. A differenza di sistemi come `systrace` che utilizzano una forma di interposizione nelle syscall (poco funzionale in un'ottica di scalabilità), LSM utilizza un sistema di [_hooks_](https://en.wikipedia.org/wiki/Hooking): sono tecniche e interfacce (dette "di hooking") che permettono di intercettare, modificare o fermare il comportamento di una determinata componente intercettando eventi, messaggi o parametri passati tra componenti, trasferendo di fatto il controllo da un processo ad un altro in modo trasparente al processo che perde il controllo dell'esecuzione. Le principali tecniche di hooking consistono nel modificare codice eseguibile a runtime per implementare un modulo e sposterne l'esecuzione, modificare il contenuto di una libreria runtime, utilizzare chiamate ad API definite e  In genere un hook può soltanto ridurre i privilegi di accesso alle risorse.
 [](http://www.di-srv.unisa.it/~ads/corso-security/www/CORSO-0304/lsm/index.htm)
 Nel caso dell'LSM ogni volta che avviene una syscall e si passa da _user space_ a _kernel space_ dopo che sono avvenuti i controlli sui dati e sulla loro integrità viene eseguito un primo controllo dal DAC. Successivamente a questo controllo entra in gioco l'hook dell'LSM che rimanda all'implementazione il controllo sulla possibilità di esecuzione della syscall. L'LSM restituisce una risposta affermativa/negativa in relazione alla possibilità di esecuzione; se la risposta è negativa viene bloccata la systemcall (**pg 9 libro selinux**). **NB**: Gli LSM di per se non sono uno strumento di sicurezza, ma un framework per l'implementazione di moduli quali SELinux o AA. 
@@ -80,10 +79,26 @@ Sono file di testo leggibili dall'essere umano che descrivono come un binario de
 E' disponibile per tutte le distribuzioni GnuLinux (eccetto le RH che di default hanno SELinux praticamente hardened e difficilissimo da sostituire senza conflitti con AA), dipendentemente dalla pachettizzazione della distro può essere necessario scaricare solo i pacchetti `apparmor` `apparmor-profiles` e `apparmor-utils` (Debian) oppure separatamente anche `apparmor-parser` e `apparmor-libapparmor` (Arch)
 
 #### Come si configura:
-`# aa-status` permette di mostrare lo stato di AA, i profili caricati (totali e divisi per tipo di profilo).
-Ogni profilo può essere portato dalla modalità enforcing alla modalità complain e viceversa attraverso i comandi `aa-enforcing` `aa-complain` seguiti come parametro dal path dell'eseguibile o dal path del file di profilo. E' poi possibile disabilitare un profilo interamente attraverso il comando `aa-disable` sempre seguito dal path o porlo in _audit-mode_ (ovvero affinchè tenga traccia nel log di tutte le chiamate a sistema, anche quelle andate a bun fine) attraverso il comando `aa-audit`
+
+        # aa-status
+
+ permette di mostrare lo stato di AA, i profili caricati (totali e divisi per tipo di profilo).
+Ogni profilo può essere portato dalla modalità enforcing alla modalità complain e viceversa attraverso i comandi
+
+         # aa-complain /usr/bit/service-name
+         # aa-enforcing /usr/bit/service-name
+
+seguiti come parametro dal path dell'eseguibile o dal path del file di profilo. E' poi possibile disabilitare un profilo interamente attraverso il comando 
+
+        # aa-disable 
+
+sempre seguito dal path o porlo in _audit-mode_ (ovvero affinchè tenga traccia nel log di tutte le chiamate a sistema, anche quelle andate a bun fine) attraverso il comando `aa-audit`
+
 _Esempi:_
-`# aa-enforce /usr/bin/service-name` pone il servizio selezionato in complain mode
+
+        # aa-enforce /usr/bin/service-name
+
+Pone il servizio selezionato in complain mode
 
 ##### Creare un nuovo profilo:
 I programmi più importanti da porre all'interno di un profilo AA sono soprattutto i programmi che interfacciano la rete, poichè sono i target più probabili di un attaccante remoto. AA fornisce il comando `aa-unconfined` che lista tutti i programmi che non hanno n profilo associato ed espongono una socket sulla rete. Con l'opzione aggiuntiva `--paranoid` si ottengono i processi non confinati che hanno almeno una connessione attiva sulla rete. 
@@ -99,12 +114,35 @@ _Nota_: `aa-genprof` non è altro che un layer sopra a `aa-logprof`: alla chiama
 E' importante, per avere un profilo preciso, utilizzare la risorsa interessata in tutti i modi possibili relativi alla stessa.
 
 #### Cheat sheet:
-* `# aa-status` // mostra i profili attivi
-* `# aa-complain`
-* `# aa-enforce` // permettono la modifica del tipo di profilo
-* `# ls /etc/apparmor.d/*` // mostra i profili esistenti
-* `# ls /etc/apparmor.d/disable/*` // mostra i profili disabilitati
-* `# aa-genprof` // layer di logprof per la generazione di un profilo
+* Mostrare i profili
+  
+
+        # aa-status 
+
+
+* Settare un determinato profilo in _complain mode_
+
+        # aa-complain
+
+* Modificare il tipo di profilo
+
+        # aa-enforce 
+
+* Mostrare i profili esistenti
+  
+        # ls /etc/apparmor.d/*
+
+* Mostrare i profili disabilitati
+  
+        # ls /etc/apparmor.d/disable/*
+        
+* Layer di `logprof` per la generazione di un profilo
+  
+        # aa-genprof 
+
+* Ricarica di un profilo
+
+        # apparmor_parser -r /etc/apparmor.d/<profile>
 
 
 ###### Fonti:
@@ -117,17 +155,62 @@ E' importante, per avere un profilo preciso, utilizzare la risorsa interessata i
 ### SELinux
 #### Cos'è: 
 Come Apparmor è un'implementazione del MAC che sfrutta il framework _Linux Security Modules_, ma a differenza di AA si basa su etichette ai file invece che ai percorsi di questi ultimi. Fu rilasciato per la prima volta nel dicembre 2000 a seguito di lavori dell'NSA (sviluppatrice iniziale del progetto) per dimostrare il valore dei controlli di accesso obbligatori in sistemi Linux (e più in generale Posix).
-Da notare che come anche AA, SELinux non può limitare exploit legati a vulnerabilità degli applicativi (può invece evitare che un applicativo exploited si comporti scondo privilegi che non possiede)
+Da notare che come anche AA, SELinux non può limitare exploit legati a vulnerabilità degli applicativi (può invece evitare che un applicativo exploited si comporti scondo privilegi che non possiede).
+A differenza di AA è un'implementazione [_Type Enforcement_](https://wiki.gentoo.org/wiki/SELinux/Type_enforcement), ovvero in cui l'accesso è governato da autorizzazioni basate sulla divisione comportamentale *subject-access-object*
+
 #### Come funziona:
 SELinux non va a sovrascrivere o modificare le policy definite dal DAC (se un sistema senza SELinux previene un determinato accesso non c'è nulla che SELinux possa fare per sovrascrivere tale comportamento) poichè l'hook dell'LSM viene triggerato _dopo_ il check del DAC permission. Per questo motivo se ad esempio si necessita di garantire l'accesso ad un file ad un nuovo utente non sarà possibile farlo attraverso una policy di SEL ma sarà necessario implementare tale policy attraverso, ad esempio, l'utilizzo delle __access control lists__ tipiche dei sistemi posix.  (`setfacl` e `getfacl` permettono di gestire permessi aggiuntivi sui file e le directories). 
 Dove SEL ha possibilità di azione è riguardo alle [**capabilities**](https://www.linuxjournal.com/article/5737)
 
+Similmente ad AA, SELinux ha diverse modalità di funzionamento:
+* `Disabled` -> totalmente disabilitato
+* `Permissive` -> (paragonabile al `complaining` di AA), registra nei log azioni che sarebbero bloccate in Enforcing, ma al tempo stesso non blocca alcuna azione
+* `Enforcing` -> applica in toto le policy bloccando le azioni dei subject che non le rispettano (paragonabile alla omonima di AA)
+
 La decisione di SELinux riguardo al consentire o negare una determinata azione è basata su il **subject** (ovvero chi compie l'azione) e l'**object** (ovvero il terget dell'azione da compiere)
 
-__nota__: SEL non ha alcuna conoscenza dell'owner del processo, di come questo è stato chiamato etc. Ciò che viene analizzato è il contesto, rappresentato da una _label_
+__nota__: SEL non ha alcuna conoscenza dell'owner del processo, di come questo è stato chiamato etc. Ciò che viene analizzato è il contesto, rappresentato da una _label_. 
+Il context dello user corrente è visionabile attraverso il comando `id -Z`. 
+La scelta di utilizzare le _label_ invece di seguire il modello di implementazione di AA in cui si segue il percorso dei binari deriva da più motivazioni:
+
+* L'utilizzo del concetto di **contesto** permette di rendere l'intero processo indipendente dall'eventuale pathname, permettendo di mappare anche hw, porte di rete o pipe
+* L'indipendenza permette inoltre l'introduzione di una forma di MLS (_Multi Level Security_), ovvero una gerarchia multilivello basata sul modello Bell-Lapadula (anch'esso basato su oggetti/soggetti e, in generale, su più livelli di gerarchia)
+
 #### Come si installa:
+_Fortemente_ consigliata per distribuzioni che la supportino a pieno (ancora meglio su distribuzioni che nascono con SELinux; in tal senso le RH sono le più indicate, seguite da OSuse, che lo supporta a pieno, e Gentoo-Hardened, da preferire ad un adattamento di un'installazione classica di Gentoo). 
+Su distribuzioni come Ubuntu è possibile installare SELinux attraverso il comando
+
+        # apt install selinux
+
+Ma solo a patto di terminare ed eliminare AA attraverso
+
+        # /etc/init.d/apparmor stop
+        # apt purge apparmor
+
 #### Come si configura:
-#### Differenze con AA:
+È possibile vedere lo stato corrente di SELinux (disabled/permissive/enforcing attraverso il comando:
+
+        # getenforce
+
+
+Per avere informazioni più dettagliate riguardo allo stato del sistema si può usare:
+
+        # sestatus
+
+ Per modificare lo stato di funzionamento si utilizza il comando
+
+        # setenforce enforcing
+        # setenforce permissive
+
+Il file di config principale si trova nella dir `/etc/selinux/config`
+
+#### Come scrivere una policy:
+
+
+
+
 #### Cheat sheet:
 ###### Fonti:
 * [Wikipedia](https://it.wikipedia.org/wiki/Security-Enhanced_Linux)
+* [Vermulen - SELinux System Administration (II ed. 2017)]()
+  
