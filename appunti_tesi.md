@@ -18,8 +18,6 @@ L'hardening dipende anche dalla famiglia di sistemi operativi che si vuole rende
 ## Linux:
 * AppArmor
 * SELinux
-* Moduli GRSecurity
-* TomoyoLinux
 * Aide 
 * ...
 
@@ -229,14 +227,107 @@ Le policy sono compilate in userspace, la principale è caricata al boot dall'in
                 auditallow Source Target:Class Permission
   - Per non garantire il permesso e non avere alcun log si utilizza `dontaudit`
   - Per fare in modo che il compiler generi un errore se i permessi specificati sono    garantiti da altre rules (da usare come controllo extra verso errori nelle policy)   si utilizza `neverallow`
-  - 
+  N.B = Ogni oggetto creato ha un sua contesto di default
+
+  - E' possibile anche eseguire un _Type Transition_, ovvero fare in modo che "ogni oggetto della classe Class creato da un processo del dominio Source e che di default avrebbe il tipo Target, ottiene invece il tipo _New Type_"
+    (E' importante notare il fatto che non si tratta di una rule, quanto più di una direttiva di azione a SELinux)
+
+               type_transition Source Target:Class new_type; 
+* **ROLE**  
+    - E' possibile definire una regola del tipo "e' possibile per un contesto di un processo con la regola Role di trovarsi nel dominio Type" attraverso la seguente dichiarazione (il tentativo di ingresso in un dominio con una Role non autorizzata porterebbe ad un `Invalid Context Error` ) :
+
+                 role ROLE types TYPE;
+
+* **DECLARATIONS**             
+    - E' possibile dichiarare un _tipo_ con nome _identifier_, a cui è anche possibile aggiungere una _attributelist_ facoltativa
+
+### Moduli
+#### Cos'è un modulo:
+Un modulo è una serie di dichiarazioni da "iniettare" nel kernel; può essere caricato/scaricato liberamente e solitamente copre le security rules di una certa appllicazione. Una semplice struttura di un m odulo potrebbe essere:
+* Definire un _tipo_ per l'eseguibile
+* Definire un _tipo_ per il dominio nel quale l'applicazione gira
+* Poichè l'applicazione gira in un modulo non definito altrove, ogni accesso ad oggetti esistenti è vietato di default
+* Si lancia l'applicazione mentre il sistema è in `Permissive Mode` (gli accessi negati verranno loggati)
+* Si utilizza `audit2allow` per creare regole che matchino con i messaggi di log
+* Si aggiustano le rules dove necessario
+(Se da un lato questo approccio ha il vantaggio di essere molto immediato, dall'altra è applicabile solo alle azioni che l'applicazione ha compiuto durante l'apertura)
+#### Creare un modulo
+* Viene creata una dir temporanea dove lavorare e si crea un link simbolico al makefile di Selinux ` ln -s /usr/share/selinux/devel/Makefile ` (si trova all'interno del development-package)
+* Si prepara un modulo iniziale creando un file con estensione `.te`
+* Si apre una shell con privilegi di root e si seguono i log
+
+         tail -f /var/log/audit/audit.log | \ grep -E '^type=(AVC|SELINUX\_ERR)'
+(I messaggi _AVC_ avvengono quando viene negato un permesso, i _SELinux\_Err_ riguardano invece tentativi di violare regole e user restrictions)
+
+* **Esempio di un modulo**: 
+
+        module haifux 1.0.0;
+
+        require {
+        type unconfined_t;
+        class process { transition sigchld };
+        class file { read x_file_perms };
+        }        
+
+La prima riga dichiara il nome e la versione del modulo, la clausola `require` indica _tipi_ e _permessi_ che il modulo si aspetta siano già esistenti e definiti
+* Se dovessimo usare un tipo senza definirlo o richiederlo avremmo un errore del tipo: `haifux.te":24:ERROR 'unknown type haifux_exec_t' at token ';' on line 1028 `
+* D'altro canto se dovessimo richiedere una classe non definita il caricamento del modulo fallirebbe: ` libsepol.print_missing_requirements: haifux's global requirements were not met: type/attribute haifux_t `
+
+Continuando con il modulo di prima:
 
 
+        module haifux 1.0.0;
 
+        require {
+        type unconfined_t;
+        class process transition;
+        }
 
+        type haifux_t;
+        type haifux_exec_t;
+
+        role unconfined_r types haifux_t;
+
+        type_transition unconfined_t haifux_exec_t : process haifux_t;
+
+In cui vengono definiti due nuovi tipi, `haifux_t` e `haifux_exec_t`. Specifica inoltre che se un processo si trova in `unconfined_t` e fa girare un eseguibile il cui dominio è `haifux_exec_t`, questo deve continuare la sua esecuzione nel dominio `haifux_t`
+
+Per compilare il modulo è necessario lanciare `make` nella working directory; il modulo binario ha estensione `.pp`
+Per caricare il modulo è necessario usare il comando:
+
+        # make load
+Per scaricarlo
+
+        # make clean
 
 ### Cheat sheet:
-###### Fonti:
+* **Basics:**
+  - `disabled` SELinux è disabilitato
+  - `permissive` logs senza blocchi
+  - `enforcing` logs e blocchi
+  - LOG: sono salvati in `var/log/audit/audit.log`
+* **Contexts**
+  - ***Users***:
+    - `unconfined_u` utente non protetto
+    - `system_u` utente di sistema
+    - `user_u` utente standard
+  - ***Role***:
+    - `object_r` file
+    - `system_r` utenti e processi
+    - `unconfined_r` utenti e processi non protetti
+  - ***Domini***:
+    - `unconfined_t` file o prcesso non protetto
+    - ...
+* **Comandi Utili**:
+  - `sestatus` mostra lo stato attuale
+  - `getenforce` mostra l'attuale stato enforcing
+  - `setenforce` cambia temporaneamente il livello di enforcing
+  - `ls -Z` mostra i contesti di sicurezza dei file
+  - `ps -Z atd` mostra i contesti di sicurezza del processo atd
+  - `sestatus -b` ritorna tutte le opzioni booleane per i servizi
+  - `ausarch -ts time | grep AVC (or denied)` lista tutte le violazioni o gli accessi negati a partire da _time_ (nel caso delle date dipende tutto dal `locale`)
+
+##### Fonti:
 * [Wikipedia](https://it.wikipedia.org/wiki/Security-Enhanced_Linux)
 * [Vermulen - SELinux System Administration (II ed. 2017)]()
 * [Writing a targeted SELinux policy](http://www.billauer.co.il/selinux-policy-module-howto.html#SECTION00023000000000000000)
