@@ -307,10 +307,30 @@ Le variabili di classe sono uniche e valide per ogni istanza della classe che le
                 puts "Number of Person instances: #{Person.number_of_instances}"    => 2
 
 
-L'**ereditarietà** viene espressa, nella definizione della classe figlia, attraverso la seguente sintassi
+L'**EREDITARIETÀ** viene espressa, nella definizione della classe figlia, attraverso la seguente sintassi. Ogni classe può tuttavia avere **soltanto una superclasse**
 
                 class child_class < sup_class
                     foo()
                 end
-                
+
 E' ovviamente possibile fare _l'override_ dei metodi, semplicemente andando a ridefinire con lo stesso nome i metodi nella classe derivata
+E' inoltre possibile accedere al metodo della superclasse attraverso la keyword `super()` </br>
+Per definire _metodi di classe_ è necessario anteporre al nome del metodo quello della classe di apartenenza 
+
+                def ClassName.method ()
+                    foo()
+                end
+
+
+##### VISIBILITÀ:
+Per dichiarare la vidibilità di un metodo è necessario, prima della sua definizione, anteporre le keywords `public` o `private` . Di default i metodi son pubblici.
+
+E' possibile utilizzare due "scorciatoie" (simili ai getter/setter di Java):
+* **attr_reader**: permette di accedere ad una variabile
+* **attr_writer**: permette di modificare una variabile
+* **attr_accessor**: permette di leggere _e_ modificare la variabile</br>
+Per tutti e tre al nome deve seguire il _simbolo_ del nome della variabile
+
+
+#### MODULI:
+
