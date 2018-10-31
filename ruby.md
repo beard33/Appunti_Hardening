@@ -343,7 +343,13 @@ E' possibile definire metodi con lo stesso nome in moduli differenti e chiamarli
 
 Per includere i moduli è necessario anteporre la keyword `require` seguita dal nome del modulo necessario 
 
-                require `module`
+                require 'module'
 
-E' possibile anche includere 
+E' possibile anche includere i moduli attraverso la keyword `include`. Ogni classe che include un modulo può utilizzarne i metodi. Quando un modulo aggiunge funzionalità  ad un metodo si parla di **mixin**.
+
+E' possibile anche utilizzare la keyword
+
+                extend 'module'
+
+Per fare in modo che l'inclusione del modulo avvenga per lo scope classe invece che per lo scope istanza
 
