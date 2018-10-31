@@ -333,4 +333,17 @@ Per tutti e tre al nome deve seguire il _simbolo_ del nome della variabile
 
 
 #### MODULI:
+Si può pensare ai moduli come toolbox che contengono set di metodi e costanti (non variabili). Per convenzione le costanti sono scritte `ALL_CAPS`.
+
+                module ModuleName
+                    foo()
+                end
+
+E' possibile definire metodi con lo stesso nome in moduli differenti e chiamarli attraverso lo _scope definitio;_ ad esempio se definisco una costante PI in un modulo Circle posso accedere a essa o a quella di Math `Math::PI` o `Circle::PI`.
+
+Per includere i moduli è necessario anteporre la keyword `require` seguita dal nome del modulo necessario 
+
+                require `module`
+
+E' possibile anche includere 
 
