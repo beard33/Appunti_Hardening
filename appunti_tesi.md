@@ -58,9 +58,26 @@ E' un framework che permette al kernel linux di supportare diverse implementazio
 [](http://www.di-srv.unisa.it/~ads/corso-security/www/CORSO-0304/lsm/index.htm)
 Nel caso dell'LSM ogni volta che avviene una syscall e si passa da _user space_ a _kernel space_ dopo che sono avvenuti i controlli sui dati e sulla loro integrità viene eseguito un primo controllo dal DAC. Successivamente a questo controllo entra in gioco l'hook dell'LSM che rimanda all'implementazione il controllo sulla possibilità di esecuzione della syscall. L'LSM restituisce una risposta affermativa/negativa in relazione alla possibilità di esecuzione; se la risposta è negativa viene bloccata la systemcall (**pg 9 libro selinux**). **NB**: Gli LSM di per se non sono uno strumento di sicurezza, ma un framework per l'implementazione di moduli quali SELinux o AA. 
 
-### Capabilities:
+### CAPABILITIES:
 Nei sistemi unix le due tipologie di privilegi sono _User_ e _Root_: la prima non ha possibilità di interazione con nessun file che non rientri nelle sue proprietà, la seconda ha accesso e modifica ad ogni elemento del sistema. L'implementazione di una via di mezzo spesso è richiesta, e intervengono le **Capabilities**. Queste dividono l'accesso al sistema in gruppi logici che possono essere aggiunti o rimossi a/da determinati processi. Una lista delle capabilities di default sono `/usr/include/linux/capabilities.h`
 La global capability definisce cosa un processo può o non può fare e se una capability arriva direttamente dal sistema non può essere sovrascritta nemmeno dall'utente root
+
+### DISK ENCRYPTION:
+Un'ulteriore misura di protezione per il raggiungimento di un buon livello di hardening del sistema èl'utilizzo della crittografia come strumento di protezione del disco e dell'utilizzo di partizioni separate (in modo da permettere un migliore isolamento dei dati e facilitando le operazioni di recovery in caso di errori)
+
+### AIDE:
+È un tool di intrusion detection che attraverso la creazione di un database (che altro non è se non uno snapshot delle parti di filesystem selezionate) contenente file e directory per eseguire manualmente (o automaticamente se impostato insieme a `cron`) 
+</br>
+Il file di configurazione si trova in `etc/aide.conf`. E' possibile utilizzare regole predefinite (`PERMS` per il controllo degli accessi, basandosi su utenti, gruppi, contesti SELinux e attributi file. `CONTENT` per il controllo di contenuto e tipo di file, `DATAONLY` per la detection di cambiamenti in dati all'interno di file e directories)</br>
+Attraverso il comando `aide --check` è possibile eseguire un controllo di integrità secondo i parametri specificati. In caso di modifiche è necessario aggiornare lo snapshot di aide attraverso il comando `aide --update`. 
+
+### LOG-CHECK:
+È un programma che automatizza la lettura dei log e permette all'amministratore di sistema di leggerli ricevendo una mail. Di default lavora come un cronjob settato ogni ora e ad ogni riavvio. </br>
+Supporta 3 livelli di contollo:
+* _paranoid_: pensato per macchine ad alt rischio che eseguono pochissimi servizi, estremamente verboso
+* _server:_ impostazione di default, contiene impostazioni per la maggior parte dei demoni di sistema
+* _workstation:_ filtra la maggior parte dei messaggi, il meno verboso dei 3
+
 
 ###### Fonti:
 * [DAC wikipedia](https://en.wikipedia.org/wiki/Discretionary_access_control)
@@ -72,7 +89,7 @@ La global capability definisce cosa un processo può o non può fare e se una ca
 --- 
 
 
-# Linux:
+# Linux (security modules):
 ## AppArmor
 
 ### Cos'è:
@@ -350,6 +367,7 @@ Per scaricarlo
 ## L'hardening su BSD:
 Per mantenere un buon livello di sicurezza su BSD è possibile utilizzare:
 * **AIDE** (Advanced Intrusion Detection Environment): prende snapshot dello stato del sistema, registra gli hash, i timestamp delle modifiche e altri parametri personalizzabili. Gli snapshot vengono utilizzati per creare un DB; quando l'admin di sistema vuole eseguire un controllo di integrità si utilizza AIDE per confrontare lo stato attuale del sistema con lo stato salvato nel database (in caso di modifiche ai parametri settati AIDE avviserà l'admin). È anche possibile settarne l'utilizzo con `cron` per eseguire controlli periodici e avvisare in caso di errori
+  
 * **ACL** (Access Control List): 
 * **Jails**
 * **Hardened BSD**
