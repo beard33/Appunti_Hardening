@@ -84,6 +84,9 @@ Supporta 3 livelli di contollo:
 * [Corso sicurezza Syracuse University](http://www.cis.syr.edu/~wedu/Teaching/cis643/LectureNotes_New/MAC.pdf)
 * [Capabilities](https://www.linuxjournal.com/article/5737)
 * [Capabilities 2](https://linux-audit.com/linux-capabilities-101/)
+* [Logcheck](http://logcheck.org/)
+* [AIDE](https://www.tecmint.com/check-integrity-of-file-and-directory-using-aide-in-linux/)
+* [AIDE_2](http://aide.sourceforge.net/)
 
 ---
 --- 
@@ -362,12 +365,130 @@ Per scaricarlo
   
 ---
 ---
-# BSD:
+# FreeBSD:
 
 ## L'hardening su BSD:
-Per mantenere un buon livello di sicurezza su BSD è possibile utilizzare:
-* **AIDE** (Advanced Intrusion Detection Environment): prende snapshot dello stato del sistema, registra gli hash, i timestamp delle modifiche e altri parametri personalizzabili. Gli snapshot vengono utilizzati per creare un DB; quando l'admin di sistema vuole eseguire un controllo di integrità si utilizza AIDE per confrontare lo stato attuale del sistema con lo stato salvato nel database (in caso di modifiche ai parametri settati AIDE avviserà l'admin). È anche possibile settarne l'utilizzo con `cron` per eseguire controlli periodici e avvisare in caso di errori
+Prima di utilizzare tools di qualsiasi tipo, è necessario innanzitutto seguire delle accortezze per portare il sistema di base alla miglior configuraione di sicurezza possibile:
+
+* Prevenire i login, attraverso comandi come `pw lock id-name`  o cambiando la shell in `chsh /usr/sbin/nologin id-name`.
+* Gestire al meglio le escalation di privilegi, ad esempio quando un utente non root necessita di permessi root; è sconsigliabile aggiungere l'utente al gruppo condiviso `wheel`  (grazie al quale un utente può ottenere i privilegi digitando **su** + **wheel-pwd** ). E' preferibile invece utilizzare il pacchetto `sudo`, il quale permette di controllare in modo più fine i permessi di un determinato utente, permettendo anche di controllare quali comandi il suddetto utente possa eseguire con privilegi e quali no. Per la modifica di tali privilegi è necessario editare `/usr/local/etc/sudoers`.
+* Utilizzare delle policy restrittive riguardo le password, riguardo la loro gestione e il loro riutilizzo attraverso l'inmplementazione del modulo built-in PAM; esso permette di spacificare diversi parametri riguardo alla lunghezza e complessità di una password, riguardo alla sua durata, al suo poter somigliare ad altre password precedenti etc etc. Per l'attivazione è necessario scommmentare in `/etc/pam.d/passwd` la riga contenente `pam_passwdqc.so` e andando a dichiarare comandi che specifichino come una pwd debba essere gestita.
+* Controllare eventuali vulnerabilità all'interno dei pacchetti installati attraverso il comando
+
+                pkg audit -f
+Esso consente di confrontare le applicazioni **di terze parti** installate sulla propria macchina con un database fornito direttamente dal team di sicurezza di FreeBSD, ottenendo ad esempio un output di questo tpo
+
+                Affected package: cups-base-1.1.22.0_1
+                Type of problem: cups-base -- HPGL buffer overflow vulnerability.
+                Reference: <https://www.FreeBSD.org/ports/portaudit/40a3bca2-6809-11d9-a9e7-0001020eed82.html>
+                1 problem(s) in your installed packages found.
+                You are advised to update or deinstall the affected package(s) immediately.
+
+
+</br>
+Per mantenere un buon livello di sicurezza su BSD è poi possibile utilizzare tool e strumenti ulteriori quali:
+
+* **AIDE** (Advanced Intrusion Detection Environment): come già visto su Linux, prende snapshot dello stato del sistema, registra gli hash, i timestamp delle modifiche e altri parametri personalizzabili. Gli snapshot vengono utilizzati per creare un DB;
+* **Logcheck**: lo stesso visto su linux, permette una scansione periodica dei log di sistema e un report secondo diversi gradi di filtro dei risultati dello scan  
+* **ACL** (Access Control List): sono un'estensione del meccanismo per esprimere regole che determinano l'accesso ad alcune risorse (che si trovano anche all'itnerno di un sistema linux) con una garanzia di maggior controllo all'amministratore. A differenza delle _capabilities_, che descrivono cosa un utente/processo può/non può fare e con che permessi, le ACL descrivono regole associate ad ogni oggetto in relazione a quali azioni possono essere eseguite da quali utenti. ACL e capabilities, insieme, formano la _Access Matrix_. Per consentire l'abilitazione delle ACL all'avvio è necessario settare in `/etc/fstab` il parametro **acls**. Usando `tunefs` è possibile impostare il flag automaticamente ed in modo permanente (di fatto modifica un superblocco nell'ACL flag dell'header di sistema); così facendo si è sicuri che non possano avvenire modifiche al flag di acls e che il sistema si avvii sempre con le ACL attive (anche senza alcun parametro all'interno di _fstab_). Una volta settate le ACL i filesystem con le ACL abilitate presentaranno un `+` a fianco delle informazioni a loro relative.
+  </br>
+Per visualizzare le ACL abilitate su un determinato elemento è sufficiente dare il comando:
+
+                getfacl nome_el
+
+
+   Per cambiare le impostazioni riguardo un determinato elemento si utilizza `setfacl`, con il flag `-k` qualora si volessero rimuovere tutte le policy esistenti o il flag `-m` per modificare le entries di default. Al netto dei flag che si possono definire in chiamata a `setacls`, i parametri standard richiesti sono sostanzialmente 5:
+
+   1. Un **ACL_TAG**: specifica il tipo di entry (_u_ per User, _g_ per Group, _owner@_, _everyone@_ (NB != da _others_ ) o _group@_ per indicare il gruppo owner )
+   2. Un **ACL_QUALIFIER**: specifica il gruppo o l'utente associato, e pertanto consiste in un _gid_ (o group name) o un _uid_ (o username).
+   3. Un elenco di **ACCESS_PERMISSIONS**: rappresentano i permessi che il gid/uid ha sull'elemento considerato, e sono  read_data
+   
+
+	     w		 write_data
+	     x		 execute
+	     p		 append_data
+	     D		 delete_child
+	     d		 delete
+	     a		 read_attributes
+	     A		 write_attributes
+	     R		 read_xattr
+	     W		 write_xattr
+	     c		 read_acl
+	     C		 write_acl
+	     o		 write_owner
+	     s		 synchronize
+
+       A cui si possono aggiungere descrizioni globali come:
+
+             Set	         Permissions
+	         full_set	 all permissions, as shown above
+	         modify_set	 all permissions except	write_acl and write_owner
+	         read_set	 read_data, read_attributes, read_xattr	and read_acl
+	         write_set	 write_data, append_data, write_attributes and
+		                	 write_xattr
+
+
+  4. Un **ACL_INEHRITANCE_FLAG**: definiscono l'ereditariet dei permessi specificati, e possono essere:
+
+
+	     f	    file_inherit
+	     d	    dir_inherit
+	     i	    inherit_only
+	     n	    no_propagate
+	     I	    inherited
+
+  5. Una definizione dell'**ACL_TYPE**: può essere "deny" o "allow"
+
+* **MAC** (Mandatory Access Control): è un'unione del framework del MAC con le ACL, in modo da fornire moduli che possano essere caricati per gestire delle policy di sicurezza. L'essere _mandatory_ implica che il rinforzo dei controlli è eseguito dal sistema direttamente. 
+</br>
+Le parole chiave quando si parla di MAC in ambito BSD sono:
+        
+  * _Compartment:_ un set di programmi o dati che vengono partizionati o separati, in cui gli utenti ricevono un'assegnazione di determinate risorse e componenti di un sistema
+  * _Integrity:_ livello di fiducia che si può riporre in un dato.
+  * _Level:_ l'impostazione di un attributo di sicurezza; al salire del livello sale anche la sua sicurezza
+  * _Label:_ attributo di sicurezza che può essere applicato ai file, alle dir o ad altri elementi del sistema. Quando è applicato ad un file ne descrive le proprietà di sicurezza, garantendo l'acesso solo a utenti e processi con label simili. 
+  * _Policies:_ collezione di regole che descrivono e definiscono il flusso di dati e informazioni tra gli elementi sottoposti a MAC
+  * _Sensitivity:_ descrive quanto un dato deve essere mantenuto confidenziale in relazione ad un utente o un processo.
+
+  **APPLICARE LE LABEL**: Sono attributi di sicurezza che vengono applicate a soggetti e oggetti e usate come parte delle decisioni di controllo d'accesso effettuate da una policy (possono essere parte di una **rule** più complessa o essere usate direttamente affinchè la policy prenda una decisione). Esistono due tipologie di policies:
+    1. _Single Label:_ di default del sistema, permette di usare solo una label per soggetto/oggetto del sistema (diminuendo l'overhead per l'amministratore, ma riducendo anche la flessibilità garantita da un'implementazione Multi Label del MAC).
+    2. _Multi Label:_ permette ad ogni oggetto di avere una propria etichetta MAC indipendente. Questo aumenta il carico per l'amministratore (in quanto tutto ha un'etichetta, compresi nodi di sistema e cartelle) ma aumenta sensibilimente la flessibilità che ne deriva. Per abilitare la modalità multilabel è necessario utilizzare il comando `# tunefs -l enable /`.
+  </br>
+
+  Per configurare le label si utilizza il comando `# setfmac` seguito dal modello di riferimento e dal flag voluto; ad esempio per utilizzare il modello _Biba_ (caratterizzato da "write up, read down" in contrasto con il BLM) su un elemento test 
+
+                # setfmac biba/high test
+  Un ammonistratore di sistema può utilizzare `setpmac` per modificare il modulo di una policy (essendo in "read down")
+
+                # setpmac biba/low setfmac biba/high test
+  Alcune policy module, tra cui Biba, MLS, e LOMac, prevedono etichettatura su 3 livelli:
+    * _Low_: è il livello più basso possibile, bloccano l'accesso a livelli superiori secondo il modello utilizzato
+    * _Equal:_ oggetti che vengono considerati esenti dalle policy, ignorati o disabilitati
+    * _High:_ livello più alto del modello Biba e MLS, nel primo ad esempio blocca il "write down"
   
-* **ACL** (Access Control List): 
+  Entrambi i modelli suddetti inoltre supportano una etichettatura numerica che consente di specificare esattamente il livello di appartenenza. Gli oggetti di sistema inoltre hanno un grado e un compartimento, i soggetti riflettono il range di permessi disponibili.
+  </br>
+  Gradi e compartimenti in oggetti e soggetti formano quelle che si chiamano **dominance**, in cui dipendentemente da livello e compartimento un soggetto _domina_ un oggetto, viceversa, o nessuno domina nessuno (stesso livello).
+ 
+  Anche agli utenti è richiesto di avere un'etichetta, cosìcche i loro file e processi possano interfacciarsi con le policies definite nel sistema e sono configurabili all'interno di `/etc/login.conf` utilizzandole login classes. (ad esempio con una riga di questo tipo)
+
+        	:label=partition/13,mls/5,biba/10(5-15),lomac/10[2]:
+   
+
+
+
+
+
+
 * **Jails**
 * **Hardened BSD**
+
+
+
+
+##### Fonti
+* [Access Matrix](https://prosuncsedu.wordpress.com/2014/08/21/comparing-object-centric-access-control-mechanisms-acl-capability-list-attribute-based-access-control/)
+* [ACL](https://www.freebsd.org/cgi/man.cgi?query=setfacl&sektion=1&manpath=freebsd-release-ports)
+* [MAC](https://www.freebsd.org/doc/handbook/mac.html)
+* [MAC-BIBA](https://www.freebsd.org/cgi/man.cgi?mac_biba)
+* [BIBA-MODEL](https://en.wikipedia.org/wiki/Biba_Model)
