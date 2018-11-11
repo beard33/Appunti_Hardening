@@ -450,7 +450,8 @@ Le parole chiave quando si parla di MAC in ambito BSD sono:
   * _Policies:_ collezione di regole che descrivono e definiscono il flusso di dati e informazioni tra gli elementi sottoposti a MAC
   * _Sensitivity:_ descrive quanto un dato deve essere mantenuto confidenziale in relazione ad un utente o un processo.
 
-  **APPLICARE LE LABEL**: Sono attributi di sicurezza che vengono applicate a soggetti e oggetti e usate come parte delle decisioni di controllo d'accesso effettuate da una policy (possono essere parte di una **rule** più complessa o essere usate direttamente affinchè la policy prenda una decisione). Esistono due tipologie di policies:
+  **APPLICARE LE LABEL**: </br>
+  Sono attributi di sicurezza che vengono applicate a soggetti e oggetti e usate come parte delle decisioni di controllo d'accesso effettuate da una policy (possono essere parte di una **rule** più complessa o essere usate direttamente affinchè la policy prenda una decisione). Esistono due tipologie di policies:
     1. _Single Label:_ di default del sistema, permette di usare solo una label per soggetto/oggetto del sistema (diminuendo l'overhead per l'amministratore, ma riducendo anche la flessibilità garantita da un'implementazione Multi Label del MAC).
     2. _Multi Label:_ permette ad ogni oggetto di avere una propria etichetta MAC indipendente. Questo aumenta il carico per l'amministratore (in quanto tutto ha un'etichetta, compresi nodi di sistema e cartelle) ma aumenta sensibilimente la flessibilità che ne deriva. Per abilitare la modalità multilabel è necessario utilizzare il comando `# tunefs -l enable /`.
   </br>
@@ -474,17 +475,60 @@ Le parole chiave quando si parla di MAC in ambito BSD sono:
 
         	:label=partition/13,mls/5,biba/10(5-15),lomac/10[2]:
    
+   Le label possono inoltre essere applicate anche alle interfacce di rete per aiutare il controllo dei dati attraverso la rete stessa. Ad esempio qualora volessimo settare una label **biba/equal** all'interfaccia `bge0` dovremo dare un comando del tipo:
+
+                # ifconfig bge0 maclabel biba/equal
 
 
+  **GESTIRE LE POLICY** </br>
+  Ogni modulo contenuto nel framework MAC **possa essere caricato come modulo kernel a runtime** attraverso `kldload`.
+  Definito il modulo, questo viene aggiunto a `/boot/loader.conf` affinchè venga avviato al boot. Le policy princcipali principali sono:
+   * _mac\_seeotheruids\.ko_ 
+   * _mac\_bsdextended\.ko_  -> fornisce un'estensione al normale modello di gestione degli accessi al filesysyem, permettendo all'amministratore di creare un set di regole simil-firewall epr gestire file e directories all'interno del fs. Si usa `ugidfw` seguito da flag per vedere e settare le policy
+   * _mac\_portacl_ ->  permette il controllo di determinate porte da parte dell'utente (anche non root) anche all'interno del range delle well-known-ports.
+   * _mac\_partition.ko_-> quando questa policy è abilitata, gli utenti possono solo vedere i loro proessi e quelli confinati alla loro partizione, ma non hanno permessi per lavorare con elementi al di fuori della partizione. 
+   * _mac\_mls.ko_ -> implementa il _MultiLevel-Security_ module, che garantisce un controllo definendo regole tra **oggetti e soggetti**. Tutto ciò che ha una lebel **low** ha il livello di _clearance_ più basso, e non ha accesso a informazioni di livello più alto. Previene anche che oggetti di livello superiore abbiano capacità di scrittura su livelli inferiori. **Equal** prende gli oggetti esenti dalla policy mentre **high** definisce  le _clearance_ più elevate, con dominanza sugli altri oggeti del s.o. e inmpossibilità di "write down". MLS definisce policy di **"No read up, No write down"** (al contrario del Bibba)
+   * _mac\_biba_
 
 
+* **JAILS**: Si basano su quello che è il `chroot`, che modifica la directory di root di una serie di processi, creando un ambiente sicuro isolato dal resot del s.o. Le jails tuttavia migliorano ed estendono il concetto di chroot sotto vari aspetti: in un chroot tradizionale i processi sono vincolati alla parte di filesystem a cui possono accedere, con il resto dei processi che è condiviso dai processi chrooted e da quelli di sistema. Le jails espandono questo concetto virtualizzando l'accesso al fs, garantendo un controllo più fine e granulare per quel che riguarda l'accesso all'environment jailed. Sono da cosiderarsi a tutti gli effetti un tool di virtualizzazione a lievllo os al pari, ad esempio, di docker. </br>
+Ogni jail è caratterizzata da 4 elementi:
+  * Una _subtree directory:_ starting point da cui si ha accesso allal jail
+  * un _hostname:_ usato dalla jail
+  * Un _IP-address:_ assegnato alla jail, spesso è un alias per un'interfaccia di rete esistente
+  * Un _comando:_ path name ad un eseguibile da eseguire all'interno della jail, relativo alla root della jail stessa
+Ogni jail ha il proprio utente root, il cui potere al di fuori della jail di lavoro è nullo.
 
+  **CREAZIONE JAILS:** </br>
+  Prima di tutto è necessario andare a definiretramite `DESTDIR` quale sarà la root della jail
 
-* **Jails**
-* **Hardened BSD**
+        # export DESTDIR=/here/is/the/jail
+  
+  e succcessivamente montare la iso
 
+        # mount -t cd9660 /dev/`mdconfig -f cdimage.iso` /mnt
 
+  Si deve poi estrarre la tarball nella destinazione DESTDIR
 
+        # tar -xf /mnt/usr/freebsd-dist/base.txz -C $DESTDIR
+
+  E successivamente costruire la jail
+
+        # setenv D /here/is/the/jail
+        # mkdir -p $D      
+        # cd /usr/src
+        # make buildworld  
+        # make installworld DESTDIR=$D  
+        # make distribution DESTDIR=$D  
+        # mount -t devfs devfs $D/dev 
+
+  I cui comandi eseguono, in ordine:
+    * Selezione della **locazione fisica** della jail (dove effettivamente risiede). Una buona scelta è una dir tipo `/user/jails/nomejail` dove _nomejail_ è l'hostname.
+    * `buildworld` permette di creare l'userland all'interno della jail
+    * `installworld` permette di installare all'interno della dir scelta come subtree tutti i man, le librerie etc 
+    * `make` installa invece ogni file aggiuntivo contenuto in `usr/src/etc/`. 
+
+  Una volta installata può essere gestita tramite l'utility `jails` o avviata al boot grazie a rc e un flie `jail.conf` che contiene i parametri e all'edit del file `rc.conf` che contiene la direttiva all'init
 
 ##### Fonti
 * [Access Matrix](https://prosuncsedu.wordpress.com/2014/08/21/comparing-object-centric-access-control-mechanisms-acl-capability-list-attribute-based-access-control/)
