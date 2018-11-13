@@ -53,10 +53,16 @@ Due regole fondamentali del MAC sono definite dal modello [Bell-Lapadula](https:
 * SS-Property: un soggetto può accedere ad un oggetto solo se il suo livello di sicurezza è maggiore od uguale a quello dell'oggetto (_No ReadUp_)
 * S-Property: un soggetto può accedere ad un oggetto in append se ha un livello di sicurezza inferiore rispetto all'oggetto (_No WriteDown_)
 
-### Linux Security Modules:
-E' un framework che permette al kernel linux di supportare diverse implementazioni dei moduli di sicurezza (tra cui il controllo MAC), e sono standard dalla versione 2.6 del kernel. A differenza di sistemi come `systrace` che utilizzano una forma di interposizione nelle syscall (poco funzionale in un'ottica di scalabilità), LSM utilizza un sistema di [_hooks_](https://en.wikipedia.org/wiki/Hooking): sono tecniche e interfacce (dette "di hooking") che permettono di intercettare, modificare o fermare il comportamento di una determinata componente intercettando eventi, messaggi o parametri passati tra componenti, trasferendo di fatto il controllo da un processo ad un altro in modo trasparente al processo che perde il controllo dell'esecuzione. Le principali tecniche di hooking consistono nel modificare codice eseguibile a runtime per implementare un modulo e sposterne l'esecuzione, modificare il contenuto di una libreria runtime, utilizzare chiamate ad API definite e  In genere un hook può soltanto ridurre i privilegi di accesso alle risorse.
-[](http://www.di-srv.unisa.it/~ads/corso-security/www/CORSO-0304/lsm/index.htm)
-Nel caso dell'LSM ogni volta che avviene una syscall e si passa da _user space_ a _kernel space_ dopo che sono avvenuti i controlli sui dati e sulla loro integrità viene eseguito un primo controllo dal DAC. Successivamente a questo controllo entra in gioco l'hook dell'LSM che rimanda all'implementazione il controllo sulla possibilità di esecuzione della syscall. L'LSM restituisce una risposta affermativa/negativa in relazione alla possibilità di esecuzione; se la risposta è negativa viene bloccata la systemcall (**pg 9 libro selinux**). **NB**: Gli LSM di per se non sono uno strumento di sicurezza, ma un framework per l'implementazione di moduli quali SELinux o AA. 
+##### FONTI:
+* [DAC wikipedia](https://en.wikipedia.org/wiki/Discretionary_access_control)
+* [Corso sicurezza Syracuse University](http://www.cis.syr.edu/~wedu/Teaching/cis643/LectureNotes_New/MAC.pdf)
+
+---
+--- 
+
+
+# Linux :
+Prima ancora di utilizzare tool esterni di hardening come gli LSM, vi sono dei toolintegrati nei sistemi Linux (e Unix in generale, talvolta) che permettono di minimizzare i rischi ancor prima di implementareg gli LSM. Alcuni esempi sono:
 
 ### CAPABILITIES:
 Nei sistemi unix le due tipologie di privilegi sono _User_ e _Root_: la prima non ha possibilità di interazione con nessun file che non rientri nelle sue proprietà, la seconda ha accesso e modifica ad ogni elemento del sistema. L'implementazione di una via di mezzo spesso è richiesta, e intervengono le **Capabilities**. Queste dividono l'accesso al sistema in gruppi logici che possono essere aggiunti o rimossi a/da determinati processi. Una lista delle capabilities di default sono `/usr/include/linux/capabilities.h`
@@ -78,21 +84,22 @@ Supporta 3 livelli di contollo:
 * _server:_ impostazione di default, contiene impostazioni per la maggior parte dei demoni di sistema
 * _workstation:_ filtra la maggior parte dei messaggi, il meno verboso dei 3
 
+### LINUX SECURITY MODULES:
+E' un framework che permette al kernel linux di supportare diverse implementazioni dei moduli di sicurezza (tra cui il controllo MAC), e sono standard dalla versione 2.6 del kernel. A differenza di sistemi come `systrace` che utilizzano una forma di interposizione nelle syscall (poco funzionale in un'ottica di scalabilità), LSM utilizza un sistema di [_hooks_](https://en.wikipedia.org/wiki/Hooking): sono tecniche e interfacce (dette "di hooking") che permettono di intercettare, modificare o fermare il comportamento di una determinata componente intercettando eventi, messaggi o parametri passati tra componenti, trasferendo di fatto il controllo da un processo ad un altro in modo trasparente al processo che perde il controllo dell'esecuzione. Le principali tecniche di hooking consistono nel modificare codice eseguibile a runtime per implementare un modulo e sposterne l'esecuzione, modificare il contenuto di una libreria runtime, utilizzare chiamate ad API definite e  In genere un hook può soltanto ridurre i privilegi di accesso alle risorse. </BR>
+[](http://www.di-srv.unisa.it/~ads/corso-security/www/CORSO-0304/lsm/index.htm)
+Nel caso dell'LSM ogni volta che avviene una syscall e si passa da _user space_ a _kernel space_ dopo che sono avvenuti i controlli sui dati e sulla loro integrità viene eseguito un primo controllo dal DAC. Successivamente a questo controllo entra in gioco l'hook dell'LSM che rimanda all'implementazione il controllo sulla possibilità di esecuzione della syscall. L'LSM restituisce una risposta affermativa/negativa in relazione alla possibilità di esecuzione; se la risposta è negativa viene bloccata la systemcall (**pg 9 libro selinux**). </br>
+ **NB**: Gli LSM di per se non sono uno strumento di sicurezza, ma un framework per l'implementazione di moduli quali SELinux o AA. 
 
-###### Fonti:
-* [DAC wikipedia](https://en.wikipedia.org/wiki/Discretionary_access_control)
-* [Corso sicurezza Syracuse University](http://www.cis.syr.edu/~wedu/Teaching/cis643/LectureNotes_New/MAC.pdf)
+##### FONTI:
 * [Capabilities](https://www.linuxjournal.com/article/5737)
 * [Capabilities 2](https://linux-audit.com/linux-capabilities-101/)
 * [Logcheck](http://logcheck.org/)
 * [AIDE](https://www.tecmint.com/check-integrity-of-file-and-directory-using-aide-in-linux/)
 * [AIDE_2](http://aide.sourceforge.net/)
+* [Access Matrix](https://prosuncsedu.wordpress.com/2014/08/21/comparing-object-centric-access-control-mechanisms-acl-capability-list-attribute-based-access-control/)
 
 ---
---- 
 
-
-# Linux (security modules):
 ## AppArmor
 
 ### Cos'è:
@@ -530,9 +537,19 @@ Ogni jail ha il proprio utente root, il cui potere al di fuori della jail di lav
 
   Una volta installata può essere gestita tramite l'utility `jails` o avviata al boot grazie a rc e un flie `jail.conf` che contiene i parametri e all'edit del file `rc.conf` che contiene la direttiva all'init
 
-##### Fonti
-* [Access Matrix](https://prosuncsedu.wordpress.com/2014/08/21/comparing-object-centric-access-control-mechanisms-acl-capability-list-attribute-based-access-control/)
+##### FONTI:
 * [ACL](https://www.freebsd.org/cgi/man.cgi?query=setfacl&sektion=1&manpath=freebsd-release-ports)
 * [MAC](https://www.freebsd.org/doc/handbook/mac.html)
 * [MAC-BIBA](https://www.freebsd.org/cgi/man.cgi?mac_biba)
 * [BIBA-MODEL](https://en.wikipedia.org/wiki/Biba_Model)
+---
+---
+
+# WINDOWS
+Come per Linux e BSD prima ancora dell'utilizzo di tool specifici vi sono delle "good practices" da seguire per minimizzare i rischi su un qualunque sistema Windwos, alcune di queste sono:
+* **CONFIGURAZIONE UTENTI**: dove possibile è preferibile disabilitare i local admin e utilizzare delle policy per le password degli utenti che non ne permetta il riuso e, se possibile, ne forzi il cambio ogni lasso di tempo definito. </br>
+Si consiglia inoltre di disabilitare l'account _local guest_ ove possibile e contollare i gruppi di appartenenza di ogni account con relativi permessi.
+* **NET CONFIG:** la rete è findamentale venga configurata a modo, con l'utilizzo di un firewall e disabilitando servizi non necessari se non utilizzati (e.g. IPv6 se non usato dalla rete di riferimento). E' necessario configurare inoltre le porte di un eventuale server affinchè vengano esposte solo quelle strettamente necessarie e configurare un firewall a dovere (soluzioni hw dedicate esclusivamente al compito di fw sono preferibili.)
+
+##### Fonti
+
