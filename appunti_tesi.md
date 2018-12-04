@@ -137,7 +137,13 @@ _Esempi:_
 Pone il servizio selezionato in complain mode
 
 ### Creare un nuovo profilo:
-I programmi più importanti da porre all'interno di un profilo AA sono soprattutto i programmi che interfacciano la rete, poichè sono i target più probabili di un attaccante remoto. AA fornisce il comando `aa-unconfined` che lista tutti i programmi che non hanno n profilo associato ed espongono una socket sulla rete. Con l'opzione aggiuntiva `--paranoid` si ottengono i processi non confinati che hanno almeno una connessione attiva sulla rete. 
+I programmi più importanti da porre all'interno di un profilo AA sono soprattutto i programmi che interfacciano la rete, poichè sono i target più probabili di un attaccante remoto. AA fornisce il comando `aa-unconfined` che lista tutti i programmi che non hanno n profilo associato ed espongono una socket sulla rete. Con l'opzione aggiuntiva `--paranoid` si ottengono i processi non confinati che hanno almeno una connessione attiva sulla rete. <br>
+Ogni modulo è formato da 3 componenti: 
+* _**Include**_ fornisce la sintassi da usare nel file
+* _**Capabilities**_ definisce le capabilities di un determinato eseguibile, ad esempio se un eseguibile ha la cap `setuid` si troverà la riga `capability setuid`
+* _**Path**_ definisce le possibiltà dell'eseguibile su determinati percorsi; non sovrascrive quelle di default di Linux, ma è invece una misura ulteriore in caso di errore nelle prime.
+
+<br>
 Per la creazione di un profilo di utilizza il comando `# aa-genprof service-name` che come prima cosa, dopo aver controllato che non esista un profilo associato, chiederà di avviare in una finestra il servizio di interesse per la profilatura della system-calls.
 Le possibilità all'esecuzione sono molteplici:
 * Qualora venisse rilevata l'esecuzione di un altro programma si può eseguire il programma con il profilo del processo padre (`inherit`), eseguirlo con un profilo dedicato(`Profile` e `Named`) in cui la differenza è la possibilità di assegnare un nome arbitrario nel secondo caso, eseguirlo con un sottoprifilo del padre (`Child`), lasciarlo senza profilo (`Unconfined`) o di non eseguirlo (`Deny`).
