@@ -124,20 +124,65 @@ Ogni profilo può essere portato dalla modalità enforcing alla modalità compla
          # aa-complain /usr/bit/service-name
          # aa-enforcing /usr/bit/service-name
 
-seguiti come parametro dal path dell'eseguibile o dal path del file di profilo. E' poi possibile disabilitare un profilo interamente attraverso il comando 
+seguiti come parametro dal path dell'eseguibile o dal path del file di profilo. E' poi possibile disabilitare un profilo interamente (nel senso di farne l'unload dal kernel) attraverso il comando 
 
         # aa-disable 
 
 sempre seguito dal path o porlo in _audit-mode_ (ovvero affinchè tenga traccia nel log di tutte le chiamate a sistema, anche quelle andate a bun fine) attraverso il comando `aa-audit`
+<br>
+È possibile inoltre andare a vedere i programmi in esecuzione che non hanno profili (ma che potrebbero necessitarne) attraverso il comando
+
+        # aa-unconfined
+
+È possibile inoltre andare a listare **tutte** le applicazioni non confinate, non solo quelle in esecuzione, attraverso il flag `--paranoid`
 
 _Esempi:_
 
         # aa-enforce /usr/bin/service-name
 
 Pone il servizio selezionato in complain mode
+<br>
+È possibile inoltre fare in modo che AppArmo invii al de notifiche di stato attraverso l'utilizzo del framework di aa `aa-notify`
+
+### Struttura di un profilo
+Un profilo di AppArmor contiene diversi blocchi:
+* **Include files**: portano le strutture di altri profili all'interno del profilo di riferimento per semplificare la struttura e stesura dei profili
+* **Abstractions**: statement di include raggruppate da task e applicazioni comuni
+* **Program Chunks**
+* **Capabilities**: entries dei profili che corrispondono alle [capabilities](http://en.wikipedia.org/wiki/POSIX#POSIX.1) POSIX andando così a gestire cosa un profilo può fare relativamente alle syscall
+* **NET Access Control Entries**: mediano l'accesso alla rete basandosi sul tipo di indirizzo e sulla famiglia di riferimento
+* **File access Control Entries**: entries per il controllo del set di file che un'applicazione può modificare/leggere/accedere
+* **RLimits entries**: entries che definiscono i limiti di risorse che un'applicazione può ricevere
+<br>
+È possibile inoltre andare a gestire il `mount` di una determinata risorsa attraverso un profilo (descrivento una policy di mount solo l'azione che matcha perfettamente con la suddetta verrà consentita). 
+<br>
+Anche gli interi che gestiscono i `signal` possono essere controllati attraverso dei profili
+
+#### Tipologie di profilo:
+* STANDARD: di default il profilo è attaccato al programma dal nome, pertanto deve matchare programma/profilo
+* UNATTACHED: non risiede nel namespace del filesystem e pertanto non sono automaticamente attaccati ad un applicativo. Il nome di un profilo qi questo tipo è preceduto dalla keyword _profile_. Profili di questo tipo non vengono usato automaticamente, devono essere convertiti a _attached_ o usati con _change profile_.
+* LOCAL: utili per definire comportamenti di elementi lanciati da applicativi, sono interni ad altri profili ed iniziano con la keyword _profile_
+* <br>
+È possibile utilizzare all'interno di un rofilo delle variabili come `@{HOME} = foo`, `@{CHROOT_BASE} = foo` etc in modo da rendere il profilo più versatile e adattivo indipendentemente dal pc su cui sta girando.
+<br>
+I **modi** di accesso ad un file possono essere:
+* r
+* w
+* a (append)
+* k (file locking mode)
+* l (link mode)
+* link (link pair rule)
+<br>
+Esiste inoltre la possibilità di lavorare sull'**owner** in modo da estendere le rules e fare in modo che siano condizionali a seconda dipendentemente dall'owner del file (l'fsuid deve matchare l'uid del file)
+
+### Execute Modes:
+* **Px**: _Discrete_, richiede che ci sia un profilo definito per una risorsa eseguita alla transizione di un dominio apparmor.
+* **Cx**: _Discrete Local_, come Px, ma cercando solo localmente tra i profili definiti all'nterno del profilo di riferimento (utile per definire profili per gli helper di alcuni applicativi)
+* **Ux**: _Unconfined_, permette l'esecuzione senza controllo da parte di AA, utile quando un programma deve eseguire operazioni da root (NB: un processo `root` potrebbe anche andare a modificare i profili stessi)
+* **Ix**: _Inherit_, quando viene eseguita la risorsa interna essa eredita il profilo corrente
 
 ### Creare un nuovo profilo:
-I programmi più importanti da porre all'interno di un profilo AA sono soprattutto i programmi che interfacciano la rete, poichè sono i target più probabili di un attaccante remoto. AA fornisce il comando `aa-unconfined` che lista tutti i programmi che non hanno n profilo associato ed espongono una socket sulla rete. Con l'opzione aggiuntiva `--paranoid` si ottengono i processi non confinati che hanno almeno una connessione attiva sulla rete. <br>
+I programmi più importanti da porre all'interno di un profilo AA sono soprattutto i programmi che interfacciano la rete, poichè sono i target più probabili di un attaccante remoto, i programmi eseguiti attraverso **cron** e i **network agents**. AA fornisce il comando `aa-unconfined` che lista tutti i programmi che non hanno n profilo associato ed espongono una socket sulla rete. Con l'opzione aggiuntiva `--paranoid` si ottengono i processi non confinati che hanno almeno una connessione attiva sulla rete. <br>
 Ogni modulo è formato da 3 componenti: 
 * _**Include**_ fornisce la sintassi da usare nel file
 * _**Capabilities**_ definisce le capabilities di un determinato eseguibile, ad esempio se un eseguibile ha la cap `setuid` si troverà la riga `capability setuid`
@@ -188,6 +233,7 @@ E' importante, per avere un profilo preciso, utilizzare la risorsa interessata i
 
 
 ###### Fonti:
+* [Profili](https://doc.opensuse.org/documentation/leap/security/html/book.security/cha.apparmor.profiles.html)
 * [Debian Handbook](https://debian-handbook.info/browse/it-IT/stable/sect.apparmor.html)
 * [Arch wiki](https://wiki.archlinux.org/index.php/AppArmor)
 * [Wiki ufficiale gitlab](https://gitlab.com/apparmor/apparmor/wikis/Documentation)
